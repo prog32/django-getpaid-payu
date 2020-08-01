@@ -5,9 +5,10 @@ from functools import wraps
 from typing import Any, Callable, List, Optional, Union
 from urllib.parse import urljoin
 
+from django.core.serializers.json import DjangoJSONEncoder
+
 import pendulum
 import requests
-from django.core.serializers.json import DjangoJSONEncoder
 from getpaid.exceptions import (
     ChargeFailure,
     CommunicationError,
@@ -94,7 +95,7 @@ class Client:
         data = deepcopy(data)
         if hasattr(data, "items"):
             return {
-                k: int(v * 100) if k in cls._convertables else cls._centify(v)
+                k: str(int(v * 100)) if k in cls._convertables else cls._centify(v)
                 for k, v in data.items()
             }
         elif isinstance(data, list):
@@ -149,19 +150,25 @@ class Client:
             {
                 "extOrderId": order_id,
                 "customerIp": customer_ip if customer_ip else "127.0.0.1",
-                "merchantPosId": self.pos_id,
+                "merchantPosId": str(self.pos_id),
                 "description": description if description else "Payment order",
-                "currencyCode": currency,
+                "currencyCode": currency.upper(),
                 "totalAmount": amount,
                 "products": products
                 if products
                 else [{"name": "Total order", "unitPrice": amount, "quantity": 1}],
             }
         )
+
         if notify_url:
             data["notifyUrl"] = notify_url
         if buyer:
             data["buyer"] = buyer
+
+        data["settings"] = {
+            "invoiceDisabled": "true"
+        }
+
         headers = self._headers(**kwargs)
         data.update(kwargs)
         encoded = json.dumps(data, cls=DjangoJSONEncoder)
