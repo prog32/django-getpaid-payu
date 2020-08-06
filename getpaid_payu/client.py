@@ -1,4 +1,5 @@
 import json
+import logging
 from copy import deepcopy
 from decimal import Decimal
 from functools import wraps
@@ -30,6 +31,8 @@ from .types import (
     RefundResponse,
     RetrieveOrderInfoResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_auth(func: Callable) -> Callable:
@@ -130,6 +133,7 @@ class Client:
         buyer: Optional[BuyerData] = None,
         products: Optional[List[ProductData]] = None,
         notify_url: Optional[str] = None,
+        continue_url: Optional[str] = None,
         **kwargs,
     ) -> PaymentResponse:
         """
@@ -162,6 +166,10 @@ class Client:
 
         if notify_url:
             data["notifyUrl"] = notify_url
+
+        if continue_url:
+            data["continueUrl"] = continue_url
+
         if buyer:
             data["buyer"] = buyer
 
@@ -172,6 +180,9 @@ class Client:
         headers = self._headers(**kwargs)
         data.update(kwargs)
         encoded = json.dumps(data, cls=DjangoJSONEncoder)
+
+        logger.info(f"PayU request: {encoded}")
+
         self.last_response = requests.post(
             url, headers=headers, data=encoded, allow_redirects=False
         )

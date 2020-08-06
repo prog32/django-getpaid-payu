@@ -132,7 +132,14 @@ class PaymentProcessor(BaseProcessor):
         #     "lastName": "Doe",
         #     "language": "pl"
         # }
-        return payu_user_info;
+        return payu_user_info
+
+
+    def get_return_url(self, request=None):
+        return self.get_full_url(
+            self.payment.get_return_url(),
+            request=request,
+        )
 
 
     def get_paywall_context(self, request=None, camelize_keys=False, **kwargs):
@@ -151,6 +158,7 @@ class PaymentProcessor(BaseProcessor):
             "order_id": "extOrderId",
             "customer_ip": "customerIp",
             "notify_url": "notifyUrl",
+            "continue_url": "continueUrl",
         }
         raw_products = self.payment.get_items()
         products = [
@@ -165,7 +173,8 @@ class PaymentProcessor(BaseProcessor):
             "currency": self.payment.currency,
             "amount": self.payment.amount_required,
             "products": products,
-            "buyer": self.get_buyer_info()
+            "buyer": self.get_buyer_info(),
+            "continue_url": self.get_return_url(request=request)
         }
         if self.get_setting("confirmation_method", self.confirmation_method) == "PUSH":
             context["notify_url"] = self.get_callback_url(
@@ -184,7 +193,6 @@ class PaymentProcessor(BaseProcessor):
     def prepare_transaction(self, request=None, view=None, **kwargs):
         method = self.get_paywall_method().upper()
         if method == bm.REST:
-
             try:
                 results = self.prepare_lock(request=request, **kwargs)
                 response = http.HttpResponseRedirect(results["url"])
@@ -212,11 +220,17 @@ class PaymentProcessor(BaseProcessor):
             )
 
     def handle_paywall_callback(self, request, **kwargs):
+
         payu_header_raw = request.headers.get(
             "Openpayu-Signature"
         ) or request.headers.get("X-Openpayu-Signature", "")
 
         if not payu_header_raw:
+            logger.warning("PayU callback: no signature")
+            logger.warning("PayU callback: no signature, msg: {}".format(
+                request.body.decode()
+            ))
+
             return HttpResponse("NO SIGNATURE", status=400)
         payu_header = {
             k: v for k, v in [i.split("=") for i in payu_header_raw.split(";")]
@@ -227,7 +241,7 @@ class PaymentProcessor(BaseProcessor):
         algorithm = getattr(hashlib, algo_name.replace("-", "").lower())
 
         body = request.body.decode()
-
+        logger.warning(f"PayU callback: {body}")
         expected_signature = algorithm(
             f"{body}{second_key}".encode("utf-8")
         ).hexdigest()
@@ -312,6 +326,7 @@ class PaymentProcessor(BaseProcessor):
     def prepare_lock(self, request=None, **kwargs):
         results = {}
         params = self.get_paywall_context(request=request, **kwargs)
+        logger.info("PayU requested: {}".format(params))
         response = self.client.new_order(**params)
         results["raw_response"] = self.client.last_response
         results["url"] = response.get("redirectUri")
