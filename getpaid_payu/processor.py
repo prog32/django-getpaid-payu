@@ -241,7 +241,6 @@ class PaymentProcessor(BaseProcessor):
         algorithm = getattr(hashlib, algo_name.replace("-", "").lower())
 
         body = request.body.decode()
-        logger.warning(f"PayU callback: {body}")
         expected_signature = algorithm(
             f"{body}{second_key}".encode("utf-8")
         ).hexdigest()
