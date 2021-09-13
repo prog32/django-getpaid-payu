@@ -16,9 +16,8 @@ from django.db.transaction import atomic
 from django.http import HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.http import urlencode
-
 from django_fsm import can_proceed
-from getpaid.adapter import get_order_adapter
+from getpaid import adapter
 from getpaid.exceptions import LockFailure
 from getpaid.post_forms import PaymentHiddenInputsPostForm
 from getpaid.processor import BaseProcessor
@@ -49,7 +48,6 @@ class PaymentProcessor(BaseProcessor):
     # Specifics
 
     def validate_config(self, config):
-        pass
         """
         validate config, raise exception on error e.g.
         """
@@ -66,11 +64,6 @@ class PaymentProcessor(BaseProcessor):
                         self.path, key
                     )
                 )
-
-    # def get_our_baseurl(self, request):
-    #     if request is None:
-    #         raise Exception("Missing request")
-    #     return super().get_our_baseurl(request)
 
     def get_client_params(self) -> dict:
         return {
@@ -96,10 +89,10 @@ class PaymentProcessor(BaseProcessor):
 
     # Helper methods
     def get_buyer_info(self):
-        # Map user info to PayU buuyer info
+        # Map user info to PayU buyer info
         # TODO: how to handle missing data?
-        order_adapter = get_order_adapter(self.payment.order)
-        user_info = order_adapter.get_user_info()
+
+        user_info = self.adapter.get_buyer_info(self.payment.order)
 
         # http://developers.payu.com/pl/restapi.html#creating_order_buyer_section_description
 
@@ -135,13 +128,6 @@ class PaymentProcessor(BaseProcessor):
         return payu_user_info
 
 
-    def get_return_url(self, request=None):
-        return self.get_full_url(
-            self.payment.get_return_url(),
-            request=request,
-        )
-
-
     def get_paywall_context(self, request=None, camelize_keys=False, **kwargs):
         # TODO: configurable buyer info inclusion
         """
@@ -174,10 +160,10 @@ class PaymentProcessor(BaseProcessor):
             "amount": self.payment.amount_required,
             "products": products,
             "buyer": self.get_buyer_info(),
-            "continue_url": self.get_return_url(request=request)
+            "continue_url": self.get_return_url(self.payment, request=request)
         }
-        if self.get_setting("confirmation_method", self.confirmation_method) == "PUSH":
-            context["notify_url"] = self.get_callback_url(
+
+            user_info = self.adapter.get_buyer_info(confirmation_self.elf.confirmation_method)
                 self.payment, request=request
             )
         if camelize_keys:
@@ -200,8 +186,10 @@ class PaymentProcessor(BaseProcessor):
                 logger.error(exc, extra=getattr(exc, "context", None))
                 self.payment.fail()
                 response = http.HttpResponseRedirect(
-                    self.get_failure_url(
-                        self.payment, request=request
+                    self.get_return_redirect_url(
+                        payment=self.payment,
+                        request=request,
+                        success=False
                     )
                 )
             self.payment.save()
@@ -325,7 +313,7 @@ class PaymentProcessor(BaseProcessor):
     def prepare_lock(self, request=None, **kwargs):
         results = {}
         params = self.get_paywall_context(request=request, **kwargs)
-        logger.info("PayU requested: {}".format(params))
+        # logger.info("PayU requested: {}".format(params))
         response = self.client.new_order(**params)
         results["raw_response"] = self.client.last_response
         results["url"] = response.get("redirectUri")
