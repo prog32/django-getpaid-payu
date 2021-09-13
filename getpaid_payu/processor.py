@@ -163,9 +163,6 @@ class PaymentProcessor(BaseProcessor):
             "continue_url": self.get_return_url(self.payment, request=request)
         }
 
-            user_info = self.adapter.get_buyer_info(confirmation_self.elf.confirmation_method)
-                self.payment, request=request
-            )
         if camelize_keys:
             return {key_trans.get(k, k): v for k, v in context.items()}
         return context
