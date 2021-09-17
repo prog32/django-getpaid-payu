@@ -20,28 +20,19 @@ class CallbackView(View):
     """
 
     def post(self, request, *args, **kwargs):
-        # async request.json()
-        # external_id = json.loads(request.data).get("paymentId")
-        # json.loads(request.body.decode("utf-8"))
-        print(f"request {request}")
-        print(f"request.body {request.body}")
-
-        logger.error(f"request {request}")
-        logger.error(f"request.body {request.body}")
-
-        # logger.error("request.POST", request.POST)
-
         json_data = json.loads(request.body)
-        logger.error(f"json_data {json_data}")
 
-        external_id = json_data.get("paymentId")
-        logger.error(f"external_id {external_id}")
+        # external_id = json_data.get("paymentId")
+        external_id = json_data.get('order', {}).get("extOrderId")
+
+        logger.info(f"external_id: {external_id}; json_data: {json_data}")
         Payment = swapper.load_model("getpaid", "Payment")
+        query_kwargs = {
+            Payment.UNIQUE_ID_FIELD: external_id,
+            # 'backend': PaymentProcessor.slug
+            # backend is equal to slug or module name! (may be different)
+        }
         payment = get_object_or_404(
-            Payment, **{
-                Payment.UNIQUE_ID_FIELD: external_id,
-                'backend': PaymentProcessor.slug
-            }
+            Payment, **query_kwargs
         )
-        logger.error(f"payment {payment}")
         return payment.handle_paywall_callback(request, *args, **kwargs)
