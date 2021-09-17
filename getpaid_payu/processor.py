@@ -147,12 +147,15 @@ class PaymentProcessor(BaseProcessor):
             "continue_url": "continueUrl",
         }
         raw_products = self.payment.get_items()
+
+
         products = [
             {key_trans.get(k, k): v for k, v in product.items()}
             for product in raw_products
         ]
 
         context = {
+            # "order_id": self.payment.id,
             "order_id": self.payment.get_unique_id(),
             "customer_ip": self.get_real_ip(request),
             "description": self.payment.description,
@@ -160,8 +163,13 @@ class PaymentProcessor(BaseProcessor):
             "amount": self.payment.amount_required,
             "products": products,
             "buyer": self.get_buyer_info(),
-            "continue_url": self.get_return_url(self.payment, request=request)
+            "continue_url": self.get_return_url(self.payment, request=request),
         }
+        notify_url = self.get_setting("notify_url")
+        if notify_url:
+            context["notify_url"] = notify_url
+
+        logger.error("context {context}")
 
         if camelize_keys:
             return {key_trans.get(k, k): v for k, v in context.items()}
@@ -196,6 +204,7 @@ class PaymentProcessor(BaseProcessor):
                 request=request, camelize_keys=True, **kwargs
             )
             data["merchantPosId"] = self.get_setting("pos_id")
+
             url = self.get_main_url()
             form = self.get_form(data)
             return TemplateResponse(
@@ -205,7 +214,7 @@ class PaymentProcessor(BaseProcessor):
             )
 
     def handle_paywall_callback(self, request, **kwargs):
-
+        logger.error("PayU handle_paywall_callback 1")
         payu_header_raw = request.headers.get(
             "Openpayu-Signature"
         ) or request.headers.get("X-Openpayu-Signature", "")
@@ -225,13 +234,16 @@ class PaymentProcessor(BaseProcessor):
         second_key = self.get_setting("second_key")
         algorithm = getattr(hashlib, algo_name.replace("-", "").lower())
 
+        logger.error("PayU handle_paywall_callback 2")
         body = request.body.decode()
+        logger.error(f"body {body}")
         expected_signature = algorithm(
             f"{body}{second_key}".encode("utf-8")
         ).hexdigest()
 
         if expected_signature == signature:
             data = json.loads(body)
+            logger.error(f"signature_ok {data}")
 
             if "order" in data:
                 order_data = data.get("order")
