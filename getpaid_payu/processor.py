@@ -234,16 +234,16 @@ class PaymentProcessor(BaseProcessor):
         second_key = self.get_setting("second_key")
         algorithm = getattr(hashlib, algo_name.replace("-", "").lower())
 
-        logger.error("PayU handle_paywall_callback 2")
+        logger.info("PayU handle_paywall_callback 2")
         body = request.body.decode()
-        logger.error(f"body {body}")
+        logger.info(f"PayU.Msg {body}")
         expected_signature = algorithm(
             f"{body}{second_key}".encode("utf-8")
         ).hexdigest()
 
         if expected_signature == signature:
             data = json.loads(body)
-            logger.error(f"signature_ok {data}")
+            logger.info(f"PayU.Msg[sign:ok] {data}")
 
             if "order" in data:
                 order_data = data.get("order")
@@ -254,7 +254,7 @@ class PaymentProcessor(BaseProcessor):
                         if can_proceed(self.payment.mark_as_paid):
                             self.payment.mark_as_paid()
                     else:
-                        logger.debug(
+                        logger.warning(
                             "Cannot confirm payment",
                             extra={
                                 "payment_id": self.payment.id,
@@ -267,7 +267,7 @@ class PaymentProcessor(BaseProcessor):
                     if can_proceed(self.payment.confirm_lock):
                         self.payment.confirm_lock()
                     else:
-                        logger.debug(
+                        logger.warning(
                             "Already locked",
                             extra={
                                 "payment_id": self.payment.id,
