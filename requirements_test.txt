@@ -1,4 +1,4 @@
-django-getpaid==2.1.0rc1
+django-getpaid==2.3.0
 
 pytest
 pytest-cov
