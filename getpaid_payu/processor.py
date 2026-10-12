@@ -169,8 +169,6 @@ class PaymentProcessor(BaseProcessor):
         if notify_url:
             context["notify_url"] = notify_url
 
-        logger.error("context {context}")
-
         if camelize_keys:
             return {key_trans.get(k, k): v for k, v in context.items()}
         return context
@@ -214,7 +212,7 @@ class PaymentProcessor(BaseProcessor):
             )
 
     def handle_paywall_callback(self, request, **kwargs):
-        logger.error("PayU handle_paywall_callback 1")
+        logger.info("PayU handle_paywall_callback 1")
         payu_header_raw = request.headers.get(
             "Openpayu-Signature"
         ) or request.headers.get("X-Openpayu-Signature", "")
